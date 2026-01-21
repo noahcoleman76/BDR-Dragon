@@ -147,6 +147,28 @@ router.post("/users", async (req: AuthRequest, res, next) => {
   }
 });
 
+router.post("/users/:id/set-password", requireAuth, requireRole("ADMIN"), async (req: AuthRequest, res, next) => {
+  try {
+    const userId = req.params.id;
+    const { newPassword } = req.body ?? {};
+
+    if (typeof newPassword !== "string" || newPassword.length < 8) {
+      return res.status(400).json({ error: "newPassword must be at least 8 characters" });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash }
+    });
+
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
 /**
  * PUT /admin/users/:id
  * body supports: role, isActive, nickname, marketIds, quotas

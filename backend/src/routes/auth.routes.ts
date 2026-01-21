@@ -13,17 +13,21 @@ const setAuthCookies = (res: Response, userId: string, role: "ADMIN" | "BASIC") 
   const isProd = process.env.NODE_ENV === "production";
 
   res.cookie("access_token", accessToken, {
-    httpOnly: true,
-    secure: isProd,
-    sameSite: "lax",
-    maxAge: 15 * 60 * 1000
-  });
-  res.cookie("refresh_token", refreshToken, {
-    httpOnly: true,
-    secure: isProd,
-    sameSite: "lax",
-    maxAge: 7 * 24 * 60 * 60 * 1000
-  });
+  httpOnly: true,
+  sameSite: "lax",
+  secure: process.env.NODE_ENV === "production",
+  path: "/"
+  // no maxAge => session cookie
+});
+
+res.cookie("refresh_token", refreshToken, {
+  httpOnly: true,
+  sameSite: "lax",
+  secure: process.env.NODE_ENV === "production",
+  path: "/auth/refresh"
+  // no maxAge => session cookie (dies when tab/browser closes)
+});
+
 };
 
 router.post("/login", async (req: AuthRequest, res: Response, next) => {

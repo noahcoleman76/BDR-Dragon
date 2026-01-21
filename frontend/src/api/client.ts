@@ -12,6 +12,7 @@ export async function apiFetch<T = any>(
     },
     ...options
   });
+  
 
   if (!res.ok) {
     const text = await res.text();
@@ -24,6 +25,7 @@ export async function apiFetch<T = any>(
     }
     throw new Error(message || `Request failed with status ${res.status}`);
   }
+  
 
   if (res.status === 204) {
     // no content

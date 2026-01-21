@@ -5,18 +5,32 @@ import { AuthRequest } from "../types/auth";
 
 const router = Router();
 
-// GET /market/me -> markets for current user (read-only)
+/**
+ * GET /market/me
+ * Returns the Market records for the current user (read-only)
+ */
 router.get("/me", requireAuth, async (req: AuthRequest, res, next) => {
   try {
     const userId = req.user!.id;
 
-    const markets = await prisma.userMarket.findMany({
+    const links = await prisma.userMarket.findMany({
       where: { userId },
-      include: { market: true },
-      orderBy: { createdAt: "desc" }
+      select: {
+        market: {
+          select: {
+            id: true,
+            name: true,
+            geographicDescription: true,
+            accountExecutives: true,
+            managerName: true,
+            startDate: true
+          }
+        }
+      }
     });
 
-    res.json(markets.map((um) => um.market));
+    const markets = links.map((l) => l.market);
+    res.json({ markets });
   } catch (err) {
     next(err);
   }

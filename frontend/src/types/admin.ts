@@ -1,16 +1,12 @@
 export type AdminMarket = {
   id: string;
   name: string;
-  geographicDescription: string | null;
-  accountExecutives: string | null;
-  managerName: string | null;
-  quotaCalls: number;
-  quotaEmails: number;
-  quotaMeetingsBooked: number;
-  quotaCleanOpportunities: number;
-  startDate: string | null;
-  createdAt: string;
-  updatedAt: string;
+  geographicDescription?: string | null;
+  accountExecutives?: string | null;
+  managerName?: string | null;
+  startDate?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type AdminUser = {
@@ -20,6 +16,10 @@ export type AdminUser = {
   role: "ADMIN" | "BASIC";
   isActive: boolean;
   createdAt: string;
+  quotaCalls: number;
+  quotaEmails: number;
+  quotaMeetingsBooked: number;
+  quotaCleanOpportunities: number;
   markets: { id: string; name: string }[];
 };
 

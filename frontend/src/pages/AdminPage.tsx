@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../api/client";
 import type { AdminMarket, AdminUser, IntegrationStatus } from "../types/admin";
 
+type Role = "ADMIN" | "BASIC";
+
 const AdminPage: React.FC = () => {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [markets, setMarkets] = useState<AdminMarket[]>([]);
@@ -11,15 +13,25 @@ const AdminPage: React.FC = () => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // create market form
+  // ---- Create / Edit Market ----
   const [mName, setMName] = useState("");
-  const [mCalls, setMCalls] = useState<number>(0);
-  const [mEmails, setMEmails] = useState<number>(0);
-  const [mMeetings, setMMeetings] = useState<number>(0);
-  const [mCleanOpps, setMCleanOpps] = useState<number>(0);
+  const [mGeo, setMGeo] = useState("");
+  const [mAes, setMAes] = useState(""); // comma-separated string
+  const [editingMarketId, setEditingMarketId] = useState<string | null>(null);
 
-  // user edit selection
+  // ---- User selection + create form ----
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+
+  // Create user form
+  const [uEmail, setUEmail] = useState("");
+  const [uRole, setURole] = useState<Role>("BASIC");
+  const [uNickname, setUNickname] = useState("");
+  const [uTempPassword, setUTempPassword] = useState("");
+  const [uQuotaCalls, setUQuotaCalls] = useState(0);
+  const [uQuotaEmails, setUQuotaEmails] = useState(0);
+  const [uQuotaMeetingsBooked, setUQuotaMeetingsBooked] = useState(0);
+  const [uQuotaCleanOpps, setUQuotaCleanOpps] = useState(0);
+  const [uMarketIds, setUMarketIds] = useState<string[]>([]);
 
   const selectedUser = useMemo(
     () => users.find((u) => u.id === selectedUserId) || null,
@@ -28,7 +40,7 @@ const AdminPage: React.FC = () => {
 
   const selectedMarketIds = useMemo(() => {
     const set = new Set<string>();
-    selectedUser?.markets.forEach((m) => set.add(m.id));
+    selectedUser?.markets?.forEach((m) => set.add(m.id));
     return set;
   }, [selectedUser]);
 
@@ -41,9 +53,11 @@ const AdminPage: React.FC = () => {
         apiFetch<AdminMarket[]>("/admin/markets"),
         apiFetch<IntegrationStatus>("/admin/integration-status")
       ]);
+
       setUsers(u);
       setMarkets(m);
       setStatus(s);
+
       if (!selectedUserId && u.length > 0) setSelectedUserId(u[0].id);
     } catch (e: any) {
       setError(e?.message || "Failed to load admin data");
@@ -57,34 +71,55 @@ const AdminPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const createMarket = async () => {
+  // ---- Market create / edit ----
+  const resetMarketForm = () => {
+    setEditingMarketId(null);
+    setMName("");
+    setMGeo("");
+    setMAes("");
+  };
+
+  const startEditMarket = (m: AdminMarket) => {
+    setEditingMarketId(m.id);
+    setMName(m.name || "");
+    setMGeo((m as any).geographicDescription || "");
+    setMAes((m as any).accountExecutives || "");
+  };
+
+  const saveMarket = async () => {
     if (!mName.trim()) return;
+
     setBusy(true);
     setError(null);
     try {
-      await apiFetch("/admin/markets", {
-        method: "POST",
-        body: JSON.stringify({
-          name: mName.trim(),
-          quotaCalls: mCalls,
-          quotaEmails: mEmails,
-          quotaMeetingsBooked: mMeetings,
-          quotaCleanOpportunities: mCleanOpps
-        })
-      });
-      setMName("");
-      setMCalls(0);
-      setMEmails(0);
-      setMMeetings(0);
-      setMCleanOpps(0);
+      const payload = {
+        name: mName.trim(),
+        geographicDescription: mGeo.trim() ? mGeo.trim() : null,
+        accountExecutives: mAes.trim() ? mAes.trim() : null
+      };
+
+      if (editingMarketId) {
+        await apiFetch(`/admin/markets/${editingMarketId}`, {
+          method: "PUT",
+          body: JSON.stringify(payload)
+        });
+      } else {
+        await apiFetch("/admin/markets", {
+          method: "POST",
+          body: JSON.stringify(payload)
+        });
+      }
+
       await loadAll();
+      resetMarketForm();
     } catch (e: any) {
-      setError(e?.message || "Failed to create market");
+      setError(e?.message || "Failed to save market");
     } finally {
       setBusy(false);
     }
   };
 
+  // ---- User updates ----
   const updateUser = async (userId: string, patch: any) => {
     setBusy(true);
     setError(null);
@@ -103,6 +138,7 @@ const AdminPage: React.FC = () => {
 
   const toggleMarketForUser = async (marketId: string) => {
     if (!selectedUser) return;
+
     const current = new Set(selectedUser.markets.map((m) => m.id));
     if (current.has(marketId)) current.delete(marketId);
     else current.add(marketId);
@@ -110,6 +146,60 @@ const AdminPage: React.FC = () => {
     await updateUser(selectedUser.id, { marketIds: Array.from(current) });
   };
 
+  // ---- Create user ----
+  const toggleMarketForNewUser = (marketId: string) => {
+    setUMarketIds((prev) => {
+      const set = new Set(prev);
+      if (set.has(marketId)) set.delete(marketId);
+      else set.add(marketId);
+      return Array.from(set);
+    });
+  };
+
+  const createUser = async () => {
+    if (!uEmail.trim()) return;
+    if (!uTempPassword || uTempPassword.length < 8) {
+      setError("Temp password must be at least 8 characters");
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    try {
+      await apiFetch("/admin/users", {
+        method: "POST",
+        body: JSON.stringify({
+          email: uEmail.trim(),
+          role: uRole,
+          nickname: uNickname.trim() ? uNickname.trim() : null,
+          tempPassword: uTempPassword,
+          marketIds: uMarketIds,
+          quotaCalls: uQuotaCalls,
+          quotaEmails: uQuotaEmails,
+          quotaMeetingsBooked: uQuotaMeetingsBooked,
+          quotaCleanOpportunities: uQuotaCleanOpps
+        })
+      });
+
+      setUEmail("");
+      setURole("BASIC");
+      setUNickname("");
+      setUTempPassword("");
+      setUQuotaCalls(0);
+      setUQuotaEmails(0);
+      setUQuotaMeetingsBooked(0);
+      setUQuotaCleanOpps(0);
+      setUMarketIds([]);
+
+      await loadAll();
+    } catch (e: any) {
+      setError(e?.message || "Failed to create user");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // ---- Manual sync ----
   const runSync = async () => {
     setBusy(true);
     setError(null);
@@ -145,7 +235,7 @@ const AdminPage: React.FC = () => {
         </div>
       ) : (
         <div className="grid gap-4 lg:grid-cols-3">
-          {/* Sync card */}
+          {/* Manual Sync */}
           <div className="bg-white dark:bg-slate-800 rounded-xl shadow p-4 border border-slate-200 dark:border-slate-700">
             <h2 className="font-semibold">Manual Sync</h2>
             <div className="mt-2 text-sm text-slate-600 dark:text-slate-300">
@@ -165,9 +255,20 @@ const AdminPage: React.FC = () => {
             </button>
           </div>
 
-          {/* Markets card */}
+          {/* Markets: create/edit + list */}
           <div className="bg-white dark:bg-slate-800 rounded-xl shadow p-4 border border-slate-200 dark:border-slate-700">
-            <h2 className="font-semibold">Markets</h2>
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="font-semibold">Markets</h2>
+              {editingMarketId && (
+                <button
+                  disabled={busy}
+                  onClick={resetMarketForm}
+                  className="text-xs px-2 py-1 rounded border border-slate-300 dark:border-slate-600 disabled:opacity-50"
+                >
+                  Cancel edit
+                </button>
+              )}
+            </div>
 
             <div className="mt-3 space-y-2">
               <input
@@ -177,43 +278,27 @@ const AdminPage: React.FC = () => {
                 onChange={(e) => setMName(e.target.value)}
               />
 
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                  className="px-3 py-2 rounded border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-sm"
-                  type="number"
-                  value={mCalls}
-                  onChange={(e) => setMCalls(Number(e.target.value))}
-                  placeholder="Calls quota"
-                />
-                <input
-                  className="px-3 py-2 rounded border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-sm"
-                  type="number"
-                  value={mEmails}
-                  onChange={(e) => setMEmails(Number(e.target.value))}
-                  placeholder="Emails quota"
-                />
-                <input
-                  className="px-3 py-2 rounded border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-sm"
-                  type="number"
-                  value={mMeetings}
-                  onChange={(e) => setMMeetings(Number(e.target.value))}
-                  placeholder="Meetings quota"
-                />
-                <input
-                  className="px-3 py-2 rounded border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-sm"
-                  type="number"
-                  value={mCleanOpps}
-                  onChange={(e) => setMCleanOpps(Number(e.target.value))}
-                  placeholder="Clean opps quota"
-                />
-              </div>
+              <textarea
+                className="w-full px-3 py-2 rounded border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-sm"
+                placeholder="Geographic description (optional)"
+                value={mGeo}
+                onChange={(e) => setMGeo(e.target.value)}
+                rows={2}
+              />
+
+              <input
+                className="w-full px-3 py-2 rounded border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-sm"
+                placeholder="Account Executives (comma-separated)"
+                value={mAes}
+                onChange={(e) => setMAes(e.target.value)}
+              />
 
               <button
                 disabled={busy}
-                onClick={createMarket}
+                onClick={saveMarket}
                 className="w-full px-3 py-2 rounded border border-slate-300 dark:border-slate-600 text-sm disabled:opacity-50"
               >
-                Create Market
+                {editingMarketId ? "Save Market" : "Create Market"}
               </button>
             </div>
 
@@ -221,23 +306,139 @@ const AdminPage: React.FC = () => {
               {markets.map((m) => (
                 <div
                   key={m.id}
-                  className="p-2 rounded border border-slate-200 dark:border-slate-700"
+                  className="p-3 rounded border border-slate-200 dark:border-slate-700"
                 >
-                  <div className="font-medium text-sm">{m.name}</div>
-                  <div className="text-xs text-slate-500">
-                    Quotas: Calls {m.quotaCalls}, Emails {m.quotaEmails}, Meetings{" "}
-                    {m.quotaMeetingsBooked}, Clean Opps {m.quotaCleanOpportunities}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-medium text-sm truncate">{m.name}</div>
+                      <div className="text-xs text-slate-500 mt-1">
+                        {(m as any).geographicDescription
+                          ? (m as any).geographicDescription
+                          : "No geo description"}
+                      </div>
+                      <div className="text-xs text-slate-500 mt-1">
+                        AEs: {(m as any).accountExecutives ? (m as any).accountExecutives : "—"}
+                      </div>
+                    </div>
+                    <button
+                      disabled={busy}
+                      onClick={() => startEditMarket(m)}
+                      className="text-xs px-2 py-1 rounded border border-slate-300 dark:border-slate-600 disabled:opacity-50"
+                    >
+                      Edit
+                    </button>
                   </div>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Users + assignments */}
+          {/* Users: create + edit + market assignment */}
           <div className="bg-white dark:bg-slate-800 rounded-xl shadow p-4 border border-slate-200 dark:border-slate-700">
             <h2 className="font-semibold">Users</h2>
 
-            <div className="mt-3">
+            {/* Create user */}
+            <div className="mt-3 p-3 rounded border border-slate-200 dark:border-slate-700">
+              <div className="font-medium text-sm">Create User</div>
+
+              <div className="mt-2 space-y-2">
+                <input
+                  className="w-full px-3 py-2 rounded border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-sm"
+                  placeholder="Email"
+                  value={uEmail}
+                  onChange={(e) => setUEmail(e.target.value)}
+                />
+
+                <input
+                  className="w-full px-3 py-2 rounded border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-sm"
+                  placeholder="Nickname (optional)"
+                  value={uNickname}
+                  onChange={(e) => setUNickname(e.target.value)}
+                />
+
+                <div className="grid grid-cols-2 gap-2">
+                  <select
+                    className="px-3 py-2 rounded border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-sm"
+                    value={uRole}
+                    onChange={(e) => setURole(e.target.value as Role)}
+                  >
+                    <option value="BASIC">BASIC</option>
+                    <option value="ADMIN">ADMIN</option>
+                  </select>
+
+                  <input
+                    className="px-3 py-2 rounded border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-sm"
+                    placeholder="Temp password (min 8)"
+                    value={uTempPassword}
+                    onChange={(e) => setUTempPassword(e.target.value)}
+                    type="password"
+                  />
+                </div>
+
+                <div className="text-xs text-slate-500 mt-1">User quotas</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    className="px-3 py-2 rounded border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-sm"
+                    type="number"
+                    value={uQuotaCalls}
+                    onChange={(e) => setUQuotaCalls(Number(e.target.value))}
+                    placeholder="Calls quota"
+                  />
+                  <input
+                    className="px-3 py-2 rounded border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-sm"
+                    type="number"
+                    value={uQuotaEmails}
+                    onChange={(e) => setUQuotaEmails(Number(e.target.value))}
+                    placeholder="Emails quota"
+                  />
+                  <input
+                    className="px-3 py-2 rounded border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-sm"
+                    type="number"
+                    value={uQuotaMeetingsBooked}
+                    onChange={(e) => setUQuotaMeetingsBooked(Number(e.target.value))}
+                    placeholder="Meetings booked quota"
+                  />
+                  <input
+                    className="px-3 py-2 rounded border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-sm"
+                    type="number"
+                    value={uQuotaCleanOpps}
+                    onChange={(e) => setUQuotaCleanOpps(Number(e.target.value))}
+                    placeholder="Clean opps quota"
+                  />
+                </div>
+
+                <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
+                  <div className="text-sm font-medium mb-2">Assign Markets</div>
+                  <div className="space-y-2 max-h-40 overflow-auto pr-1">
+                    {markets.map((m) => (
+                      <label
+                        key={m.id}
+                        className="flex items-center justify-between gap-2 p-2 rounded border border-slate-200 dark:border-slate-700 text-sm"
+                      >
+                        <span className="truncate">{m.name}</span>
+                        <input
+                          type="checkbox"
+                          checked={uMarketIds.includes(m.id)}
+                          onChange={() => toggleMarketForNewUser(m.id)}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  disabled={busy}
+                  onClick={createUser}
+                  className="w-full px-3 py-2 rounded bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 text-sm disabled:opacity-50"
+                >
+                  {busy ? "Working..." : "Create User"}
+                </button>
+              </div>
+            </div>
+
+            {/* Existing user select */}
+            <div className="mt-4">
+              <div className="text-sm font-medium mb-2">Edit Existing User</div>
               <select
                 className="w-full px-3 py-2 rounded border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-sm"
                 value={selectedUserId ?? ""}
@@ -260,7 +461,7 @@ const AdminPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="flex gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   <button
                     disabled={busy}
                     onClick={() =>
@@ -268,7 +469,7 @@ const AdminPage: React.FC = () => {
                         role: selectedUser.role === "ADMIN" ? "BASIC" : "ADMIN"
                       })
                     }
-                    className="flex-1 px-3 py-2 rounded border border-slate-300 dark:border-slate-600 text-sm disabled:opacity-50"
+                    className="px-3 py-2 rounded border border-slate-300 dark:border-slate-600 text-sm disabled:opacity-50"
                   >
                     Toggle Role
                   </button>
@@ -276,7 +477,7 @@ const AdminPage: React.FC = () => {
                   <button
                     disabled={busy}
                     onClick={() => updateUser(selectedUser.id, { isActive: !selectedUser.isActive })}
-                    className="flex-1 px-3 py-2 rounded border border-slate-300 dark:border-slate-600 text-sm disabled:opacity-50"
+                    className="px-3 py-2 rounded border border-slate-300 dark:border-slate-600 text-sm disabled:opacity-50"
                   >
                     {selectedUser.isActive ? "Deactivate" : "Activate"}
                   </button>
@@ -284,7 +485,7 @@ const AdminPage: React.FC = () => {
 
                 <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
                   <div className="text-sm font-medium mb-2">Assigned Markets</div>
-                  <div className="space-y-2">
+                  <div className="space-y-2 max-h-40 overflow-auto pr-1">
                     {markets.map((m) => (
                       <label
                         key={m.id}

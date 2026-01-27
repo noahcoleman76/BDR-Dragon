@@ -13,5 +13,9 @@ Body → JSON:
   "password": "Password123!"
 }
 
-
 Send
+
+
+
+to create admin password
+npm run seed:admin

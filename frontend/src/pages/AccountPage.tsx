@@ -5,7 +5,8 @@ import { apiFetch } from "../api/client";
 type MeResponse = {
   id: string;
   email: string;
-  nickname: string | null;
+  firstName: string | null;
+  lastName: string | null;
   role: "ADMIN" | "BASIC";
   isActive: boolean;
   createdAt: string;
@@ -23,7 +24,8 @@ const AccountPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const [nickname, setNickname] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -34,7 +36,8 @@ const AccountPage: React.FC = () => {
     try {
       const res = await apiFetch<MeResponse>("/users/me");
       setMe(res);
-      setNickname(res.nickname ?? "");
+      setFirstName(res.firstName ?? "");
+      setLastName(res.lastName ?? "");
     } catch (e: any) {
       setError(e?.message || "Failed to load account");
     } finally {
@@ -45,25 +48,6 @@ const AccountPage: React.FC = () => {
   useEffect(() => {
     loadMe();
   }, []);
-
-  const saveNickname = async () => {
-    if (!me) return;
-    setBusy(true);
-    setError(null);
-    setSuccess(null);
-    try {
-      const res = await apiFetch<MeResponse>("/users/me", {
-        method: "PUT",
-        body: JSON.stringify({ nickname: nickname.trim() || null })
-      });
-      setMe(res);
-      setSuccess("Nickname updated.");
-    } catch (e: any) {
-      setError(e?.message || "Failed to update nickname");
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const changePassword = async () => {
     setBusy(true);
@@ -129,22 +113,9 @@ const AccountPage: React.FC = () => {
               </div>
 
               <div className="mt-4">
-                <label className="block text-sm text-slate-500 mb-1">Nickname</label>
-                <input
-                  className="w-full px-3 py-2 rounded border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-sm"
-                  value={nickname}
-                  onChange={(e) => setNickname(e.target.value)}
-                  placeholder="Your display name"
-                />
+                <label className="block text-sm text-slate-500 mb-1">{firstName} {lastName}</label>
               </div>
 
-              <button
-                disabled={busy}
-                onClick={saveNickname}
-                className="mt-3 w-full px-3 py-2 rounded bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 text-sm disabled:opacity-50"
-              >
-                {busy ? "Saving..." : "Save Nickname"}
-              </button>
             </div>
 
             {/* Quotas */}

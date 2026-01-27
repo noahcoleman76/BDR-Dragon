@@ -21,7 +21,8 @@ router.get("/users", async (_req: AuthRequest, res, next) => {
       select: {
         id: true,
         email: true,
-        nickname: true,
+        firstName: true,
+        lastName: true,
         role: true,
         isActive: true,
         createdAt: true,
@@ -44,7 +45,8 @@ router.get("/users", async (_req: AuthRequest, res, next) => {
       users.map((u) => ({
         id: u.id,
         email: u.email,
-        nickname: u.nickname,
+        firstName: u.firstName,
+        lastName: u.lastName,
         role: u.role,
         isActive: u.isActive,
         createdAt: u.createdAt,
@@ -63,7 +65,7 @@ router.get("/users", async (_req: AuthRequest, res, next) => {
 /**
  * POST /admin/users
  * body: {
- *  email, role, nickname?, tempPassword,
+ *  email, role, firstName?, lastName?, tempPassword,
  *  marketIds?: string[],
  *  quotaCalls?, quotaEmails?, quotaMeetingsBooked?, quotaCleanOpportunities?
  * }
@@ -73,7 +75,8 @@ router.post("/users", async (req: AuthRequest, res, next) => {
     const {
       email,
       role,
-      nickname,
+      firstName,
+      lastName,
       tempPassword,
       marketIds,
       quotaCalls,
@@ -97,7 +100,8 @@ router.post("/users", async (req: AuthRequest, res, next) => {
       data: {
         email,
         role,
-        nickname: nickname ?? null,
+        firstName: firstName ?? null,
+        lastName: lastName ?? null,
         passwordHash,
         isActive: true,
         quotaCalls: Number(quotaCalls) || 0,
@@ -135,7 +139,8 @@ router.post("/users", async (req: AuthRequest, res, next) => {
       id: user.id,
       email: user.email,
       role: user.role,
-      nickname: user.nickname,
+      firstName: user.firstName,
+      lastName: user.lastName,
       isActive: user.isActive,
       quotaCalls: user.quotaCalls,
       quotaEmails: user.quotaEmails,
@@ -171,7 +176,7 @@ router.post("/users/:id/set-password", requireAuth, requireRole("ADMIN"), async 
 
 /**
  * PUT /admin/users/:id
- * body supports: role, isActive, nickname, marketIds, quotas
+ * body supports: role, isActive, firstName, lastName, marketIds, quotas
  */
 router.put("/users/:id", async (req: AuthRequest, res, next) => {
   try {
@@ -183,7 +188,8 @@ router.put("/users/:id", async (req: AuthRequest, res, next) => {
     const {
       role,
       isActive,
-      nickname,
+      firstName,
+      lastName,
       marketIds,
       quotaCalls,
       quotaEmails,
@@ -196,7 +202,8 @@ router.put("/users/:id", async (req: AuthRequest, res, next) => {
       data: {
         role: role === "ADMIN" || role === "BASIC" ? role : undefined,
         isActive: typeof isActive === "boolean" ? isActive : undefined,
-        nickname: nickname !== undefined ? (nickname ?? null) : undefined,
+        firstName: firstName !== undefined ? (firstName ?? null) : undefined,
+        lastName: lastName !== undefined ? (lastName ?? null) : undefined,        
         quotaCalls: quotaCalls !== undefined ? Number(quotaCalls) : undefined,
         quotaEmails: quotaEmails !== undefined ? Number(quotaEmails) : undefined,
         quotaMeetingsBooked: quotaMeetingsBooked !== undefined ? Number(quotaMeetingsBooked) : undefined,
@@ -232,7 +239,8 @@ router.put("/users/:id", async (req: AuthRequest, res, next) => {
     res.json({
       id: updated.id,
       email: updated.email,
-      nickname: updated.nickname,
+      firstName: updated.firstName,
+      lastName: updated.lastName,
       role: updated.role,
       isActive: updated.isActive,
       createdAt: updated.createdAt,
@@ -315,6 +323,34 @@ router.put("/markets/:id", async (req: AuthRequest, res, next) => {
     next(err);
   }
 });
+
+// delete admin market
+router.delete("/markets/:id", async (req: AuthRequest, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const existing = await prisma.market.findUnique({ where: { id } });
+    if (!existing) throw new ApiError(404, "Market not found");
+
+    await prisma.$transaction([
+      // remove all user ↔ market assignments
+      prisma.userMarket.deleteMany({
+        where: { marketId: id }
+      }),
+
+      // delete the market itself
+      prisma.market.delete({
+        where: { id }
+      })
+    ]);
+
+    res.status(204).send();
+  } catch (err) {
+    next(err);
+  }
+});
+
+
 
 /**
  * INTEGRATION STATUS

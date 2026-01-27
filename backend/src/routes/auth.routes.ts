@@ -42,7 +42,8 @@ router.post("/login", async (req: AuthRequest, res: Response, next) => {
       id: user.id,
       email: user.email,
       role: user.role,
-      nickname: user.nickname
+      firstName: user.firstName,
+      lastName: user.lastName
     });
   } catch (err) {
     next(err);
@@ -86,7 +87,7 @@ router.post("/change-password", requireAuth, async (req: AuthRequest, res: Respo
 // admin-only register
 router.post("/register", requireAuth, requireRole("ADMIN"), async (req: AuthRequest, res, next) => {
   try {
-    const { email, role, nickname, tempPassword } = req.body;
+    const { email, role, firstName, lastName, tempPassword } = req.body;
     if (!email || !tempPassword) throw new ApiError(400, "email and tempPassword required");
 
     const normalizedRole = role === "ADMIN" ? "ADMIN" : "BASIC";
@@ -94,7 +95,8 @@ router.post("/register", requireAuth, requireRole("ADMIN"), async (req: AuthRequ
     const user = await createUser({
       email,
       role: normalizedRole,
-      nickname,
+      firstName,
+      lastName,
       tempPassword
     });
 
@@ -102,7 +104,8 @@ router.post("/register", requireAuth, requireRole("ADMIN"), async (req: AuthRequ
       id: user.id,
       email: user.email,
       role: user.role,
-      nickname: user.nickname
+      firstName: user.firstName,
+      lastName: user.lastName
     });
   } catch (err) {
     next(err);

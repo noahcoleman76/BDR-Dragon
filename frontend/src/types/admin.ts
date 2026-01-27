@@ -12,7 +12,8 @@ export type AdminMarket = {
 export type AdminUser = {
   id: string;
   email: string;
-  nickname: string | null;
+  firstName: string;
+  lastName: string;
   role: "ADMIN" | "BASIC";
   isActive: boolean;
   createdAt: string;

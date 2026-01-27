@@ -5,10 +5,11 @@ import { useNavigate } from "react-router-dom";
 const LoginPage: React.FC = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState("admin@bdrdragon.test");
-  const [password, setPassword] = useState("Password123!");
+  const [email, setEmail] = useState("admin@bdrdragon.local");
+  const [password, setPassword] = useState("Admin123!");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,14 +47,25 @@ const LoginPage: React.FC = () => {
           </div>
           <div>
             <label className="block text-sm mb-1">Password</label>
-            <input
-              className="w-full px-3 py-2 rounded border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
-            />
+            <div className="relative">
+              <input
+                className="w-full px-3 py-2 pr-10 rounded border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700"
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute inset-y-0 right-2 text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                tabIndex={-1}
+              >
+                {showPassword ? "Hide" : "Show"}
+              </button>
+            </div>
           </div>
+
           <button
             type="submit"
             disabled={loading}

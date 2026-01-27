@@ -13,7 +13,8 @@ export const findUserByEmail = (email: string) => {
 export const createUser = async (params: {
   email: string;
   role: RoleType;
-  nickname?: string;
+  firstName: string;
+  lastName: string;
   tempPassword: string;
 }) => {
   const passwordHash = await hashPassword(params.tempPassword);
@@ -23,8 +24,9 @@ export const createUser = async (params: {
       email: params.email,
       passwordHash,
       role: params.role,
-      nickname: params.nickname
-    }
+      firstName: params.firstName,
+      lastName: params.lastName,
+    },
   });
 
   // default task lists

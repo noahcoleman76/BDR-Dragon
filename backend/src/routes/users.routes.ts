@@ -2,16 +2,16 @@ import { Router } from "express";
 import { requireAuth } from "../middleware/auth";
 import { AuthRequest } from "../types/auth";
 import { prisma } from "../prisma/client";
-import { ApiError } from "../middleware/errorHandler";
 
 const router = Router();
 
 const userMeSelect = {
   id: true,
   email: true,
-  nickname: true,
   role: true,
   isActive: true,
+  firstName: true,
+  lastName: true,
   createdAt: true,
   updatedAt: true,
   quotaCalls: true,
@@ -26,32 +26,36 @@ router.get("/me", requireAuth, async (req: AuthRequest, res, next) => {
       where: { id: req.user!.id },
       select: userMeSelect
     });
-
-    if (!user) throw new ApiError(404, "User not found");
     res.json(user);
   } catch (err) {
     next(err);
   }
 });
 
+/**
+ * PUT /users/me
+ * Only ADMIN can update name (firstName/lastName)
+ * Everyone can keep this endpoint for future self-settings, but for now we block name updates for BASIC.
+ */
 router.put("/me", requireAuth, async (req: AuthRequest, res, next) => {
   try {
-    const { nickname } = req.body ?? {};
+    const { firstName, lastName } = req.body ?? {};
 
-    if (nickname !== undefined) {
-      if (nickname !== null && typeof nickname !== "string") {
-        throw new ApiError(400, "nickname must be a string or null");
-      }
-      if (typeof nickname === "string" && nickname.length > 50) {
-        throw new ApiError(400, "nickname must be 50 characters or less");
-      }
+    // Only admins can change name
+    if (req.user!.role !== "ADMIN") {
+      return res.status(403).json({ error: "Only admins can update user name" });
+    }
+
+    if (typeof firstName !== "string" || !firstName.trim()) {
+      return res.status(400).json({ error: "firstName is required" });
+    }
+    if (typeof lastName !== "string" || !lastName.trim()) {
+      return res.status(400).json({ error: "lastName is required" });
     }
 
     const user = await prisma.user.update({
       where: { id: req.user!.id },
-      data: {
-        nickname: nickname === undefined ? undefined : nickname
-      },
+      data: { firstName: firstName.trim(), lastName: lastName.trim() },
       select: userMeSelect
     });
 

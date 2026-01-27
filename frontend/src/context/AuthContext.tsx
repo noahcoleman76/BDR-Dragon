@@ -4,7 +4,8 @@ import { apiFetch } from "../api/client";
 export type User = {
   id: string;
   email: string;
-  nickname?: string | null;
+  firstname?: string | null;
+  lastName?: string | null;
   role: "ADMIN" | "BASIC";
   isActive: boolean;
 };

@@ -15,7 +15,12 @@ export const createApp = () => {
 
   app.use(
     cors({
-      origin: env.CORS_ORIGIN,
+      origin: [
+        env.CORS_ORIGIN,
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "https://noahcoleman76.github.io"
+      ],
       credentials: true
     })
   );

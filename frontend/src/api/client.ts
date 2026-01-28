@@ -1,18 +1,25 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000";
+const API_BASE_URL =
+  (import.meta.env.VITE_API_URL as string | undefined) ||
+  "http://localhost:4000";
+
+function joinUrl(base: string, path: string) {
+  const b = base.replace(/\/+$/, "");
+  const p = path.startsWith("/") ? path : `/${path}`;
+  return `${b}${p}`;
+}
 
 export async function apiFetch<T = any>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const res = await fetch(`${API_BASE_URL}${path}`, {
+  const res = await fetch(joinUrl(API_BASE_URL, path), {
+    ...options,
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
       ...(options.headers || {})
-    },
-    ...options
+    }
   });
-  
 
   if (!res.ok) {
     const text = await res.text();
@@ -21,16 +28,11 @@ export async function apiFetch<T = any>(
       const json = JSON.parse(text);
       message = json.message || text;
     } catch {
-      // ignore parse error
+      // ignore
     }
     throw new Error(message || `Request failed with status ${res.status}`);
   }
-  
 
-  if (res.status === 204) {
-    // no content
-    return null as T;
-  }
-
+  if (res.status === 204) return null as T;
   return (await res.json()) as T;
 }

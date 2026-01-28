@@ -8,7 +8,8 @@
     "start": "node dist/server.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "seed:admin": "ts-node-dev --transpile-only src/scripts/seedAdmin.ts"
+    "seed:admin": "ts-node-dev --transpile-only src/scripts/seedAdmin.ts",
+      "seed:admin:prod": "node dist/scripts/seedAdminProd.js"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

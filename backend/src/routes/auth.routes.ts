@@ -10,24 +10,28 @@ const router = Router();
 const setAuthCookies = (res: Response, userId: string, role: "ADMIN" | "BASIC") => {
   const accessToken = signAccessToken({ sub: userId, role });
   const refreshToken = signRefreshToken({ sub: userId, role });
+
   const isProd = process.env.NODE_ENV === "production";
 
+  // For GitHub Pages -> Render, cookies must be cross-site:
+  // SameSite=None + Secure (in production).
   res.cookie("access_token", accessToken, {
-  httpOnly: true,
-  sameSite: "lax",
-  secure: process.env.NODE_ENV === "production",
-  path: "/"
-  // no maxAge => session cookie
-});
+    httpOnly: true,
+    secure: isProd,                 // must be true when SameSite=None
+    sameSite: isProd ? "none" : "lax",
+    path: "/",                      // send access cookie to all routes
+    // optional but recommended:
+    // maxAge: 15 * 60 * 1000,
+  });
 
-res.cookie("refresh_token", refreshToken, {
-  httpOnly: true,
-  sameSite: "lax",
-  secure: process.env.NODE_ENV === "production",
-  path: "/auth/refresh"
-  // no maxAge => session cookie (dies when tab/browser closes)
-});
-
+  res.cookie("refresh_token", refreshToken, {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? "none" : "lax",
+    path: "/auth/refresh",          // only send refresh cookie to refresh endpoint
+    // optional but recommended:
+    // maxAge: 7 * 24 * 60 * 60 * 1000,
+  });
 };
 
 router.post("/login", async (req: AuthRequest, res: Response, next) => {
@@ -51,8 +55,13 @@ router.post("/login", async (req: AuthRequest, res: Response, next) => {
 });
 
 router.post("/logout", (_req, res) => {
-  res.clearCookie("access_token");
-  res.clearCookie("refresh_token");
+  const isProd = process.env.NODE_ENV === "production";
+  const sameSite = isProd ? "none" : "lax";
+  const secure = isProd;
+
+  res.clearCookie("access_token", { path: "/", sameSite, secure });
+  res.clearCookie("refresh_token", { path: "/auth/refresh", sameSite, secure });
+
   return res.json({ message: "Logged out" });
 });
 

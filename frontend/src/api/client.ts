@@ -4,9 +4,16 @@ const API_BASE_URL =
 
 console.log("API_BASE_URL at runtime:", API_BASE_URL);
 
+function normalizeBase(base: string) {
+  // remove duplicate protocol mistakes
+  return base
+    .replace(/^https?:\/\/https?:\/\//, "https://")
+    .replace(/^https?:\/\/https\/\//, "https://")
+    .replace(/\/+$/, "");
+}
 
 function joinUrl(base: string, path: string) {
-  const b = base.replace(/\/+$/, "");
+  const b = normalizeBase(base);
   const p = path.startsWith("/") ? path : `/${path}`;
   return `${b}${p}`;
 }

@@ -13,17 +13,20 @@ import { errorHandler } from "./middleware/errorHandler";
 export const createApp = () => {
   const app = express();
 
+  const allowedOrigins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "https://noahcoleman76.github.io",
+    env.CORS_ORIGIN, // optional extra origin
+  ].filter(Boolean);
+
   app.use(
     cors({
-      origin: [
-        env.CORS_ORIGIN,
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "https://noahcoleman76.github.io"
-      ],
-      credentials: true
+      origin: allowedOrigins,
+      credentials: true,
     })
   );
+
   app.use(cookieParser());
   app.use(express.json());
 
